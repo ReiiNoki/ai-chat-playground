@@ -1,0 +1,42 @@
+function byId<T extends HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`Missing element: ${id}`);
+  return element as T;
+}
+
+export const settingsToggle = byId<HTMLButtonElement>("settings-toggle");
+export const settingsPanel = byId<HTMLElement>("settings-panel");
+export const settingsForm = byId<HTMLFormElement>("settings-form");
+export const tabsList = byId<HTMLElement>("tabs-list");
+export const newChatButton = byId<HTMLButtonElement>("new-chat");
+export const providerPreset = byId<HTMLSelectElement>("provider-preset");
+export const saveEndpointButton = byId<HTMLButtonElement>("save-endpoint");
+export const removeEndpointButton = byId<HTMLButtonElement>("remove-endpoint");
+export const endpointStatus = byId<HTMLElement>("endpoint-status");
+export const baseUrlInput = byId<HTMLInputElement>("base-url");
+export const apiKeyInput = byId<HTMLInputElement>("api-key");
+export const keyVisibilityButton = byId<HTMLButtonElement>("key-visibility");
+export const modelInput = byId<HTMLInputElement>("model");
+export const modelSelect = byId<HTMLSelectElement>("model-select");
+export const loadModelsButton = byId<HTMLButtonElement>("load-models");
+export const modelStatus = byId<HTMLElement>("model-status");
+export const systemPromptInput = byId<HTMLTextAreaElement>("system-prompt");
+export const temperatureInput = byId<HTMLInputElement>("temperature");
+export const maxTokensInput = byId<HTMLInputElement>("max-tokens");
+export const topPInput = byId<HTMLInputElement>("top-p");
+export const seedInput = byId<HTMLInputElement>("seed");
+export const connectionStatus = byId<HTMLElement>("connection-status");
+export const testConnectionButton = byId<HTMLButtonElement>("test-connection");
+export const settingsChangeStatus = byId<HTMLElement>("settings-change-status");
+export const settingsCancelButton = byId<HTMLButtonElement>("settings-cancel");
+export const settingsSaveButton = byId<HTMLButtonElement>("settings-save");
+export const storageStatus = byId<HTMLElement>("storage-status");
+export const exportChatButton = byId<HTMLButtonElement>("export-chat");
+export const clearAllChatsButton = byId<HTMLButtonElement>("clear-all-chats");
+export const clearAllKeysButton = byId<HTMLButtonElement>("clear-all-keys");
+export const chatElement = byId<HTMLElement>("chat");
+export const messageInput = byId<HTMLTextAreaElement>("message-input");
+export const clearButton = byId<HTMLButtonElement>("clear-button");
+export const sendButton = byId<HTMLButtonElement>("send-button");
+export const scrollBottomButton = byId<HTMLButtonElement>("scroll-bottom");
+export const toastRegion = byId<HTMLElement>("toast-region");

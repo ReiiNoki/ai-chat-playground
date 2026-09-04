@@ -1,0 +1,22 @@
+# Dependencies and generated output
+node_modules/
+dist/
+release/
+coverage/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+.tmp-*/
+*.tmp
+*.temp
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
