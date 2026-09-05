@@ -38,6 +38,7 @@ export class DataController {
   clearAllChatMessages(): void {
     if (!window.confirm("Clear the messages in every chat? This cannot be undone.")) return;
     for (const session of this.store.chats) {
+      session.mutationVersion += 1;
       if (session.controller) this.callbacks.stopGenerating(session);
       session.messages = [];
       session.error = "";

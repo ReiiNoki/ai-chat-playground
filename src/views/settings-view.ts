@@ -1,3 +1,4 @@
+import { endpointOrigin } from "../domain/config";
 import type { ChatSession } from "../domain/types";
 import { normalizedBaseUrl } from "../domain/providers";
 import type { ApiConfig, SavedEndpoint } from "../services/storage";
@@ -49,6 +50,7 @@ export type SettingsViewHandlers = {
 export class SettingsView {
   private handlers: SettingsViewHandlers | null = null;
   private savedConfig: ApiConfig | null = null;
+  private keyOrigin: string | null = null;
 
   constructor() {
     settingsToggle.addEventListener("click", () => this.handlers?.onToggle());
@@ -81,17 +83,22 @@ export class SettingsView {
 
     providerPreset.addEventListener("change", () => {
       if (providerPreset.value) baseUrlInput.value = providerPreset.value;
-      removeEndpointButton.hidden = !providerPreset.selectedOptions[0]?.dataset.customEndpointId;
       endpointStatus.textContent = "";
+      this.protectKeyFromOriginChange();
+      removeEndpointButton.hidden = !providerPreset.selectedOptions[0]?.dataset.customEndpointId;
       this.handlers?.onConnectionChange(true);
     });
 
     baseUrlInput.addEventListener("input", () => {
-      this.syncProviderPreset();
       endpointStatus.textContent = "";
+      this.protectKeyFromOriginChange();
+      this.syncProviderPreset();
       this.handlers?.onConnectionChange(true);
     });
-    apiKeyInput.addEventListener("input", () => this.handlers?.onConnectionChange(true));
+    apiKeyInput.addEventListener("input", () => {
+      this.keyOrigin = endpointOrigin(baseUrlInput.value);
+      this.handlers?.onConnectionChange(true);
+    });
 
     modelSelect.addEventListener("change", () => {
       if (modelSelect.value === "__custom_model__") {
@@ -132,6 +139,7 @@ export class SettingsView {
     this.syncProviderPreset();
     endpointStatus.textContent = "";
     apiKeyInput.value = session.config.apiKey;
+    this.keyOrigin = endpointOrigin(session.config.baseUrl);
     apiKeyInput.type = "password";
     keyVisibilityButton.textContent = "Show";
     keyVisibilityButton.setAttribute("aria-label", "Show API key");
@@ -296,6 +304,15 @@ export class SettingsView {
       Object.is(left.topP, right.topP) &&
       Object.is(left.seed, right.seed)
     );
+  }
+
+  private protectKeyFromOriginChange(): void {
+    const nextOrigin = endpointOrigin(baseUrlInput.value);
+    if (apiKeyInput.value && nextOrigin && this.keyOrigin && nextOrigin !== this.keyOrigin) {
+      apiKeyInput.value = "";
+      this.keyOrigin = nextOrigin;
+      endpointStatus.textContent = "API key cleared because the API host changed.";
+    }
   }
 
   private toggleKeyVisibility(): void {

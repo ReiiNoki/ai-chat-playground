@@ -26,7 +26,7 @@ When the user loads models, tests a connection, or sends a chat message, the ext
 
 These requests are governed by the privacy policy and terms of the selected API provider. The extension developer does not receive these requests.
 
-For a custom endpoint, the extension may request the endpoint origin's favicon and home page without cookies or a referrer in order to display a tab icon. The downloaded page is only inspected for favicon declarations and is not executed.
+For a custom endpoint, the extension may request the endpoint origin's favicon and home page without cookies or a referrer in order to display a tab icon. Favicon discovery is limited to the same origin as the configured endpoint; redirects or icon declarations pointing to other origins are ignored. The downloaded page is only inspected for favicon declarations and is not executed.
 
 ## Host access
 

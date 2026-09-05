@@ -3,6 +3,7 @@ import type { ChatSession } from "../domain/types";
 import { ApiError, streamChat, type Message } from "../services/chat-api";
 import { HostPermissionService } from "../services/host-permission";
 import { PersistenceService } from "../services/persistence";
+import type { ApiConfig } from "../services/storage";
 import { SidepanelStore } from "../stores/app";
 import { ChatView } from "../views/chat-view";
 
@@ -80,11 +81,12 @@ export class ChatController {
   private async generateAssistant(
     session: ChatSession,
     requestMessages: Message[],
+    controller: AbortController,
+    persist = true,
+    config: ApiConfig = { ...session.config },
   ): Promise<GenerationResult> {
     const assistantMessage: Message = { role: "assistant", content: "", reasoning: "" };
     let completed = false;
-    const controller = new AbortController();
-    session.controller = controller;
     session.retryStatus = "";
     session.messages.push(assistantMessage);
 
@@ -95,7 +97,7 @@ export class ChatController {
 
     try {
       await streamChat({
-        config: { ...session.config },
+        config,
         messages: requestMessages,
         signal: controller.signal,
         onRetry: (info) => {
@@ -113,7 +115,7 @@ export class ChatController {
           if (delta.reasoning) {
             assistantMessage.reasoning = (assistantMessage.reasoning ?? "") + delta.reasoning;
           }
-          this.persistence.schedule();
+          if (persist) this.persistence.schedule();
           if (session.id === this.store.activeChatId) {
             this.view.scheduleStreamingAssistant(session, assistantMessage, delta, () => {
               if (session.id === this.store.activeChatId) this.followNewContent(session);
@@ -139,7 +141,7 @@ export class ChatController {
     } finally {
       if (session.controller === controller) session.controller = null;
       session.retryStatus = "";
-      void this.persistence.save().catch(this.callbacks.reportStorageError);
+      if (persist) void this.persistence.save().catch(this.callbacks.reportStorageError);
       if (session.id === this.store.activeChatId) {
         this.callbacks.renderChat();
         this.view.setGenerating(session.controller !== null);
@@ -170,14 +172,48 @@ export class ChatController {
       if (session.id === this.store.activeChatId) this.callbacks.renderChat();
       return;
     }
-    if (!(await this.ensureApiAccess(session))) return;
+    if (
+      assistantIndex < session.messages.length - 1 &&
+      !window.confirm("Regenerating this response will remove the messages after it. Continue?")
+    ) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const config = { ...session.config };
+    session.controller = controller;
+    if (session.id === this.store.activeChatId) this.view.setGenerating(true);
+    if (!(await this.ensureApiAccess(session, config.baseUrl))) {
+      if (session.controller === controller) session.controller = null;
+      if (session.id === this.store.activeChatId) this.view.setGenerating(false);
+      return;
+    }
+    if (controller.signal.aborted || session.controller !== controller || !this.store.findChat(session.id)) return;
 
     session.error = "";
     session.stickToBottom = true;
     session.hasNewContent = false;
-    session.messages = session.messages.slice(0, assistantIndex);
-    void this.persistence.save().catch(this.callbacks.reportStorageError);
-    await this.generateAssistant(session, apiMessages(session.messages));
+    const originalMessages = session.messages;
+    const mutationVersion = session.mutationVersion;
+    const prefix = originalMessages.slice(0, assistantIndex);
+    this.persistence.suspend();
+    try {
+      session.messages = prefix;
+      const result = await this.generateAssistant(
+        session,
+        apiMessages(prefix),
+        controller,
+        false,
+        config,
+      );
+      if (!result.completed && session.mutationVersion === mutationVersion) {
+        session.messages = originalMessages;
+        if (session.id === this.store.activeChatId) this.callbacks.renderChat();
+      }
+    } finally {
+      void this.persistence.save();
+      this.persistence.resume();
+    }
   }
 
   private async sendMessage(): Promise<void> {
@@ -193,20 +229,30 @@ export class ChatController {
       this.callbacks.renderChat();
       return;
     }
-    if (!(await this.ensureApiAccess(session))) return;
+    const controller = new AbortController();
+    const config = { ...session.config };
+    session.controller = controller;
+    if (session.id === this.store.activeChatId) this.view.setGenerating(true);
+    if (!(await this.ensureApiAccess(session, config.baseUrl))) {
+      if (session.controller === controller) session.controller = null;
+      if (session.id === this.store.activeChatId) this.view.setGenerating(false);
+      return;
+    }
+    if (controller.signal.aborted || session.controller !== controller || !this.store.findChat(session.id)) return;
 
     session.error = "";
     session.stickToBottom = true;
     session.hasNewContent = false;
+    const mutationVersion = session.mutationVersion;
     const userMessage: Message = { role: "user", content };
     session.messages.push(userMessage);
     void this.persistence.save().catch(this.callbacks.reportStorageError);
     const requestMessages = apiMessages(session.messages);
     session.draft = "";
-    this.view.clearDraft();
-    const result = await this.generateAssistant(session, requestMessages);
+    if (session.id === this.store.activeChatId) this.view.clearDraft();
+    const result = await this.generateAssistant(session, requestMessages, controller, true, config);
 
-    if (!result.completed && !result.hasOutput) {
+    if (!result.completed && !result.hasOutput && session.mutationVersion === mutationVersion) {
       removeMessage(session, userMessage);
       session.draft = session.draft ? `${content}\n\n${session.draft}` : content;
       if (session.id === this.store.activeChatId) {
@@ -217,8 +263,8 @@ export class ChatController {
     }
   }
 
-  private async ensureApiAccess(session: ChatSession): Promise<boolean> {
-    if (await this.hostPermission.requestAccess(session.config.baseUrl)) {
+  private async ensureApiAccess(session: ChatSession, baseUrl: string): Promise<boolean> {
+    if (await this.hostPermission.requestAccess(baseUrl)) {
       this.callbacks.onHostPermissionGranted();
       return true;
     }
@@ -231,6 +277,7 @@ export class ChatController {
   private clearCurrentChat(): void {
     const session = this.store.activeChat;
     if (!session) return;
+    session.mutationVersion += 1;
     this.stopGenerating(session);
     session.messages = [];
     session.error = "";

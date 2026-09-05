@@ -5,11 +5,13 @@ export type ChatSession = {
   id: string;
   config: ApiConfig;
   messages: Message[];
+  mutationVersion: number;
   draft: string;
   error: string;
   modelOptions: string[];
   modelStatus: string;
   loadingModels: boolean;
+  modelController: AbortController | null;
   connectionStatus: string;
   retryStatus: string;
   stickToBottom: boolean;

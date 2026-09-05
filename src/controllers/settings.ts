@@ -1,4 +1,9 @@
-import { NETWORK_ERROR, validateConfig } from "../domain/config";
+import {
+  NETWORK_ERROR,
+  parseBaseUrl,
+  validateConfig,
+  validateCredentialTransport,
+} from "../domain/config";
 import { isBuiltInEndpoint, normalizedBaseUrl } from "../domain/providers";
 import { ApiError, listModels, testChatConnection } from "../services/chat-api";
 import { HostPermissionService } from "../services/host-permission";
@@ -19,6 +24,8 @@ type SettingsControllerCallbacks = {
 };
 
 export class SettingsController {
+  private saveInProgress = false;
+
   constructor(
     private readonly store: SidepanelStore,
     private readonly view: SettingsView,
@@ -60,7 +67,7 @@ export class SettingsController {
 
   private async saveSettings(config: ApiConfig): Promise<void> {
     const session = this.store.activeChat;
-    if (!session) return;
+    if (!session || this.saveInProgress) return;
 
     const configurationError = validateConfig(config);
     if (configurationError) {
@@ -68,35 +75,44 @@ export class SettingsController {
       this.view.setConnectionStatus(configurationError);
       return;
     }
-    if (!(await this.hostPermission.requestAccess(config.baseUrl))) {
-      session.connectionStatus = "Access to this API host was not granted.";
-      this.view.setConnectionStatus(session.connectionStatus);
-      return;
+    this.saveInProgress = true;
+    try {
+      if (!(await this.hostPermission.requestAccess(config.baseUrl))) {
+        session.connectionStatus = "Access to this API host was not granted.";
+        if (session.id === this.store.activeChatId) this.view.setConnectionStatus(session.connectionStatus);
+        return;
+      }
+
+      this.callbacks.onHostPermissionGranted();
+      session.config = { ...config };
+      await this.persistence.save();
+      session.error = "";
+      if (session.id === this.store.activeChatId) {
+        this.view.setOpen(false);
+        this.callbacks.notify("Settings saved.", "success");
+        this.callbacks.onSettingsSaved();
+      }
+    } catch {
+      session.error = "Could not save settings.";
+      this.callbacks.notify("Could not save settings.", "error");
+      if (session.id === this.store.activeChatId) this.callbacks.renderChat();
+    } finally {
+      this.saveInProgress = false;
     }
-
-    this.callbacks.onHostPermissionGranted();
-    session.config = config;
-
-    void this.persistence
-      .save()
-      .then(() => {
-        session.error = "";
-        if (session.id === this.store.activeChatId) {
-          this.view.setOpen(false);
-          this.callbacks.notify("Settings saved.", "success");
-          this.callbacks.onSettingsSaved();
-        }
-      })
-      .catch(() => {
-        session.error = "Could not save settings.";
-        this.callbacks.notify("Could not save settings.", "error");
-        if (session.id === this.store.activeChatId) this.callbacks.renderChat();
-      });
   }
 
   private handleConnectionChange(clearModels: boolean): void {
     const session = this.store.activeChat;
     if (!session) return;
+    session.testController?.abort();
+    session.testController = null;
+    session.testingConnection = false;
+    this.view.setTesting(false);
+    if (clearModels) {
+      session.modelController?.abort();
+      session.modelController = null;
+      session.loadingModels = false;
+    }
     session.connectionStatus = "";
     this.view.setConnectionStatus("");
     if (!clearModels) return;
@@ -108,12 +124,11 @@ export class SettingsController {
 
   private saveCurrentEndpoint(value: string): void {
     const normalized = normalizedBaseUrl(value);
-    let parsed: URL;
-    try {
-      parsed = new URL(normalized);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error();
-    } catch {
-      this.view.setEndpointStatus("Enter a valid HTTP or HTTPS Base URL first.");
+    const parsed = parseBaseUrl(normalized);
+    if (!parsed) {
+      this.view.setEndpointStatus(
+        "Enter an HTTP or HTTPS Base URL without credentials, query parameters, or fragments.",
+      );
       return;
     }
 
@@ -177,19 +192,33 @@ export class SettingsController {
       return;
     }
 
-    if (!(await this.hostPermission.requestAccess(config.baseUrl))) {
-      session.connectionStatus = "Access to this API host was not granted.";
-      this.view.setConnectionStatus(session.connectionStatus);
-      return;
-    }
-    this.callbacks.onHostPermissionGranted();
-
     const controller = new AbortController();
     session.testingConnection = true;
     session.testController = controller;
-    session.connectionStatus = "Testing Chat Completions…";
+    session.connectionStatus = "Requesting API access…";
     this.view.setConnectionStatus(session.connectionStatus);
     this.view.setTesting(true);
+
+    if (!(await this.hostPermission.requestAccess(config.baseUrl))) {
+      if (session.testController === controller) {
+        session.connectionStatus = "Access to this API host was not granted.";
+        session.testController = null;
+        session.testingConnection = false;
+        if (session.id === this.store.activeChatId) {
+          this.view.setConnectionStatus(session.connectionStatus);
+          this.view.setTesting(false);
+        }
+      }
+      return;
+    }
+    if (controller.signal.aborted || session.testController !== controller || !this.store.findChat(session.id)) return;
+    this.callbacks.onHostPermissionGranted();
+
+    session.connectionStatus = "Testing Chat Completions…";
+    if (session.id === this.store.activeChatId) {
+      this.view.setConnectionStatus(session.connectionStatus);
+      this.view.setTesting(true);
+    }
 
     try {
       await testChatConnection(config, controller.signal);
@@ -199,11 +228,13 @@ export class SettingsController {
         session.connectionStatus = error instanceof ApiError ? error.displayMessage : NETWORK_ERROR;
       }
     } finally {
-      session.testingConnection = false;
-      if (session.testController === controller) session.testController = null;
-      if (session.id === this.store.activeChatId) {
-        this.view.setConnectionStatus(session.connectionStatus);
-        this.view.setTesting(false);
+      if (session.testController === controller) {
+        session.testingConnection = false;
+        session.testController = null;
+        if (session.id === this.store.activeChatId) {
+          this.view.setConnectionStatus(session.connectionStatus);
+          this.view.setTesting(false);
+        }
       }
     }
   }
@@ -211,18 +242,19 @@ export class SettingsController {
   private async loadAvailableModels(baseUrl: string, apiKey: string): Promise<void> {
     const session = this.store.activeChat;
     if (!session || session.loadingModels) return;
-    if (!baseUrl) {
-      session.error = "Enter a Base URL before loading models.";
+    if (!baseUrl || !parseBaseUrl(baseUrl)) {
+      session.error = "Enter a valid HTTP or HTTPS Base URL before loading models.";
       this.callbacks.renderChat();
       return;
     }
-    if (!(await this.hostPermission.requestAccess(baseUrl))) {
-      session.error = "Access to this API host was not granted.";
+    const transportError = validateCredentialTransport(baseUrl, apiKey);
+    if (transportError) {
+      session.error = transportError;
       this.callbacks.renderChat();
       return;
     }
-    this.callbacks.onHostPermissionGranted();
-
+    const controller = new AbortController();
+    session.modelController = controller;
     session.loadingModels = true;
     session.modelOptions = [];
     session.modelStatus = "";
@@ -230,8 +262,23 @@ export class SettingsController {
     this.view.renderModelOptions(session);
     this.callbacks.renderChat();
 
+    if (!(await this.hostPermission.requestAccess(baseUrl))) {
+      if (session.modelController === controller) {
+        session.error = "Access to this API host was not granted.";
+        session.modelController = null;
+        session.loadingModels = false;
+        if (session.id === this.store.activeChatId) {
+          this.view.renderModelOptions(session);
+          this.callbacks.renderChat();
+        }
+      }
+      return;
+    }
+    if (controller.signal.aborted || session.modelController !== controller || !this.store.findChat(session.id)) return;
+    this.callbacks.onHostPermissionGranted();
+
     try {
-      const models = await listModels(baseUrl, apiKey);
+      const models = await listModels(baseUrl, apiKey, controller.signal);
       session.modelOptions = models;
       if (models.length === 0) {
         session.error = "The API returned no models.";
@@ -240,13 +287,18 @@ export class SettingsController {
         if (session.id === this.store.activeChatId) this.view.setModelIfEmpty(models[0] ?? "");
       }
     } catch (error) {
-      session.error = error instanceof ApiError ? error.displayMessage : NETWORK_ERROR;
+      if (!controller.signal.aborted && session.modelController === controller) {
+        session.error = error instanceof ApiError ? error.displayMessage : NETWORK_ERROR;
+      }
     } finally {
-      session.loadingModels = false;
-      if (session.id === this.store.activeChatId) {
-        this.view.renderModelOptions(session);
-        this.callbacks.renderChat();
-        if (session.modelOptions.length > 0) this.view.focusModelSelect();
+      if (session.modelController === controller) {
+        session.modelController = null;
+        session.loadingModels = false;
+        if (session.id === this.store.activeChatId) {
+          this.view.renderModelOptions(session);
+          this.callbacks.renderChat();
+          if (session.modelOptions.length > 0) this.view.focusModelSelect();
+        }
       }
     }
   }

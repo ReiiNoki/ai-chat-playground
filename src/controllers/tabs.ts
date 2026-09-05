@@ -100,6 +100,7 @@ export class TabsController {
     if (wasActive && !this.canLeaveActiveChat()) return;
     session.controller?.abort();
     session.testController?.abort();
+    session.modelController?.abort();
     if (!this.store.closeChat(id)) return;
 
     if (wasActive) this.settingsView.setOpen(false);
