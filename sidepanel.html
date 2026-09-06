@@ -8,21 +8,6 @@
   </head>
   <body>
     <main class="app">
-      <header class="app-header">
-        <h1>AI Chat Playground</h1>
-        <button
-          id="settings-toggle"
-          class="icon-button"
-          type="button"
-          aria-label="Toggle settings"
-          aria-expanded="false"
-          aria-controls="settings-panel"
-          title="Settings"
-        >
-          <span aria-hidden="true">⚙</span>
-        </button>
-      </header>
-
       <nav class="tabs-bar" aria-label="Chats">
         <div id="tabs-list" class="tabs-list" role="tablist"></div>
         <button id="new-chat" class="new-chat-button" type="button" aria-label="New chat" title="New chat">+</button>
@@ -30,70 +15,90 @@
 
       <section id="settings-panel" class="settings" aria-label="API settings" hidden>
         <form id="settings-form">
-          <label for="provider-preset">Provider</label>
-          <div class="provider-input-row">
-            <select id="provider-preset" name="providerPreset">
-              <option value="">Custom endpoint</option>
-              <option value="https://api.openai.com/v1">OpenAI (GPT API)</option>
-              <option value="https://openrouter.ai/api/v1">OpenRouter</option>
-              <option value="https://open.bigmodel.cn/api/paas/v4">GLM / 智谱</option>
-              <option value="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen / 通义千问</option>
-              <option value="https://api.minimax.io/v1">MiniMax (Global)</option>
-              <option value="https://api.minimaxi.com/v1">MiniMax (China)</option>
-              <option value="https://api.deepseek.com/v1">DeepSeek</option>
-              <option value="https://api.moonshot.cn/v1">Moonshot / Kimi</option>
-              <option value="https://api.siliconflow.cn/v1">SiliconFlow / 硅基流动</option>
-              <option value="https://api.groq.com/openai/v1">Groq</option>
-              <option value="https://generativelanguage.googleapis.com/v1beta/openai">Google Gemini</option>
-              <option value="https://api.x.ai/v1">xAI</option>
+          <fieldset class="settings-section language-settings">
+            <legend>Language</legend>
+            <label for="ui-language">Interface language</label>
+            <select id="ui-language" name="uiLanguage">
+              <option value="en">English</option>
+              <option value="zh-CN">Simplified Chinese</option>
             </select>
-            <button id="save-endpoint" class="small-button" type="button" title="Save current Base URL">+ URL</button>
-            <button id="remove-endpoint" class="small-button" type="button" title="Remove saved endpoint" hidden>−</button>
-          </div>
-          <div id="endpoint-status" class="form-status" aria-live="polite"></div>
+          </fieldset>
 
-          <label for="base-url">Base URL</label>
-          <input
-            id="base-url"
-            name="baseUrl"
-            type="url"
-            placeholder="https://api.example.com/v1"
-            autocomplete="url"
-            required
-          />
+          <fieldset class="settings-section">
+            <legend>Connection</legend>
 
-          <label for="api-key">API Key (optional)</label>
-          <div class="key-input-row">
+            <label for="provider-preset">Provider</label>
+            <div class="provider-input-row">
+              <select id="provider-preset" name="providerPreset">
+                <option value="">Custom endpoint</option>
+                <option value="https://api.openai.com/v1">OpenAI (GPT API)</option>
+                <option value="https://openrouter.ai/api/v1">OpenRouter</option>
+                <option value="https://open.bigmodel.cn/api/paas/v4">GLM / 智谱</option>
+                <option value="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen / 通义千问</option>
+                <option value="https://api.minimax.io/v1">MiniMax (Global)</option>
+                <option value="https://api.minimaxi.com/v1">MiniMax (China)</option>
+                <option value="https://api.xiaomimimo.com/v1" data-default-model="mimo-v2.5-pro" data-models="mimo-v2-flash,mimo-v2-pro,mimo-v2-omni,mimo-v2.5,mimo-v2.5-pro">Xiaomi MiMo / 小米</option>
+                <option value="https://api.deepseek.com/v1">DeepSeek</option>
+                <option value="https://api.moonshot.cn/v1">Moonshot / Kimi</option>
+                <option value="https://api.siliconflow.cn/v1">SiliconFlow / 硅基流动</option>
+                <option value="https://api.groq.com/openai/v1">Groq</option>
+                <option value="https://generativelanguage.googleapis.com/v1beta/openai">Google Gemini</option>
+                <option value="https://api.x.ai/v1">xAI</option>
+              </select>
+              <button id="save-endpoint" class="small-button" type="button" title="Save current Base URL">Save URL</button>
+              <button id="remove-endpoint" class="small-button danger-button" type="button" title="Remove saved endpoint" hidden>Remove</button>
+            </div>
+            <div id="endpoint-status" class="form-status" aria-live="polite"></div>
+
+            <label for="base-url">Base URL</label>
             <input
-              id="api-key"
-              name="apiKey"
-              type="password"
-              placeholder="Optional for local APIs"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button id="key-visibility" class="small-button" type="button" aria-label="Show API key">
-              Show
-            </button>
-          </div>
-
-          <label for="model">Model</label>
-          <div class="model-input-row">
-            <input
-              id="model"
-              name="model"
-              type="text"
-              placeholder="model-name"
-              spellcheck="false"
+              id="base-url"
+              name="baseUrl"
+              type="url"
+              placeholder="https://api.example.com/v1"
+              autocomplete="url"
               required
             />
-            <select id="model-select" aria-label="Available models" hidden></select>
-            <button id="load-models" class="small-button" type="button">Load</button>
-          </div>
-          <div id="model-status" class="form-status" aria-live="polite"></div>
 
-          <label for="system-prompt">System Prompt</label>
-          <textarea id="system-prompt" name="systemPrompt" rows="3">You are a helpful assistant.</textarea>
+            <label for="api-key">API Key <span class="label-note">optional</span></label>
+            <div class="key-input-row">
+              <input
+                id="api-key"
+                name="apiKey"
+                type="password"
+                placeholder="Stored locally in this browser"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button id="key-visibility" class="small-button" type="button" aria-label="Show API key">
+                Show
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="settings-section">
+            <legend>Model & behavior</legend>
+
+            <label for="model">Model</label>
+            <div class="model-input-row">
+              <input
+                id="model"
+                name="model"
+                type="text"
+                placeholder="model-name"
+                list="model-suggestions"
+                spellcheck="false"
+                required
+              />
+              <datalist id="model-suggestions"></datalist>
+              <select id="model-select" aria-label="Available models" hidden></select>
+              <button id="load-models" class="small-button" type="button">Load models</button>
+            </div>
+            <div id="model-status" class="form-status" aria-live="polite"></div>
+
+            <label for="system-prompt">System Prompt</label>
+            <textarea id="system-prompt" name="systemPrompt" rows="3">You are a helpful assistant.</textarea>
+          </fieldset>
 
           <details class="advanced-settings">
             <summary>Advanced parameters</summary>
@@ -112,29 +117,56 @@
             </div>
           </details>
 
+          <details class="shortcuts-settings">
+            <summary>Keyboard shortcuts</summary>
+            <div class="shortcuts-body">
+              <label for="send-shortcut">Send message with</label>
+              <select id="send-shortcut" name="sendShortcut">
+                <option value="enter">Enter</option>
+                <option value="mod-enter">Ctrl/Cmd + Enter</option>
+              </select>
+              <dl class="shortcuts-list">
+                <div>
+                  <dt id="send-shortcut-key">Enter</dt>
+                  <dd>Send message</dd>
+                </div>
+                <div>
+                  <dt id="newline-shortcut-key">Shift + Enter</dt>
+                  <dd>New line</dd>
+                </div>
+                <div>
+                  <dt>Escape</dt>
+                  <dd>Stop generating</dd>
+                </div>
+              </dl>
+            </div>
+          </details>
+
           <details class="data-settings">
             <summary>Local data</summary>
             <div id="storage-status" class="form-status">Calculating storage…</div>
             <div class="data-actions">
               <button id="export-chat" class="small-button" type="button">Export Markdown</button>
-              <button id="clear-all-chats" class="small-button" type="button">Clear all chats</button>
-              <button id="clear-all-keys" class="small-button" type="button">Clear API keys</button>
+              <button id="clear-all-chats" class="small-button danger-button" type="button">Clear all chats</button>
+              <button id="clear-all-keys" class="small-button danger-button" type="button">Clear API keys</button>
             </div>
           </details>
 
           <div id="connection-status" class="form-status" aria-live="polite"></div>
           <div id="settings-change-status" class="form-status settings-change-status" aria-live="polite"></div>
           <div class="settings-actions">
-            <button id="test-connection" class="small-button" type="button" title="Send a small Chat Completions request">Test</button>
+            <button id="test-connection" class="small-button" type="button" title="Send a small Chat Completions request">Test connection</button>
             <button id="settings-cancel" class="small-button" type="button">Cancel</button>
             <button id="settings-save" class="primary-button" type="submit" disabled>Save</button>
           </div>
         </form>
       </section>
 
-      <section id="chat" class="chat" aria-label="Chat messages" aria-live="polite">
-        <div id="empty-state" class="empty-state">Configure an API, then send a message.</div>
-      </section>
+      <div class="chat-shell">
+        <section id="chat" class="chat" aria-label="Chat messages" aria-live="polite">
+          <div id="empty-state" class="empty-state">Configure an API, then send a message.</div>
+        </section>
+      </div>
 
       <button id="scroll-bottom" class="scroll-bottom-button" type="button" hidden>↓ New content</button>
 
@@ -146,9 +178,23 @@
           aria-label="Message"
         ></textarea>
         <div class="composer-actions">
-          <button id="clear-button" class="text-button" type="button">Clear</button>
-          <span class="composer-hint">Enter to send · Shift+Enter for new line</span>
-          <button id="send-button" class="primary-button" type="button">Send</button>
+          <div class="composer-secondary-actions">
+            <button id="clear-button" class="text-button" type="button">Clear</button>
+            <button
+              id="settings-toggle"
+              class="text-button"
+              type="button"
+              aria-label="Toggle settings"
+              aria-expanded="false"
+              aria-controls="settings-panel"
+              title="Configure API settings"
+            >
+              Configure
+            </button>
+          </div>
+          <div class="composer-primary-actions">
+            <button id="send-button" class="primary-button" type="button">Send</button>
+          </div>
         </div>
       </section>
 

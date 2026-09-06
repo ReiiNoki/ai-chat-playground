@@ -28,3 +28,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 Provider names and logos may be trademarks of their respective owners.
+
+The Xiaomi MiMo logo in `src/assets/providers/xiaomi-mimo.png` is reproduced from the official Xiaomi MiMo documentation site (mimo.mi.com) for identification purposes only and remains a trademark of its owner.

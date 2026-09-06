@@ -1,7 +1,8 @@
 import { endpointOrigin } from "../domain/config";
+import { t, type UiLanguage } from "../lib/i18n";
 import type { ChatSession } from "../domain/types";
 import { normalizedBaseUrl } from "../domain/providers";
-import type { ApiConfig, SavedEndpoint } from "../services/storage";
+import type { ApiConfig, SavedEndpoint, SendShortcut } from "../services/storage";
 import {
   apiKeyInput,
   baseUrlInput,
@@ -11,15 +12,20 @@ import {
   endpointStatus,
   exportChatButton,
   keyVisibilityButton,
+  languageSelect,
   loadModelsButton,
   maxTokensInput,
   modelInput,
   modelSelect,
+  modelSuggestions,
   modelStatus,
   providerPreset,
   removeEndpointButton,
   saveEndpointButton,
   seedInput,
+  sendShortcutKey,
+  sendShortcutSelect,
+  newlineShortcutKey,
   settingsCancelButton,
   settingsChangeStatus,
   settingsForm,
@@ -42,6 +48,8 @@ export type SettingsViewHandlers = {
   onSaveEndpoint: (baseUrl: string) => void;
   onRemoveEndpoint: (endpointId: string) => void;
   onConnectionChange: (clearModels: boolean) => void;
+  onSendShortcutChange: (shortcut: SendShortcut) => void;
+  onLanguageChange: (language: UiLanguage) => void;
   onExportChat: () => void;
   onClearAllChats: () => void;
   onClearAllKeys: () => void;
@@ -80,9 +88,21 @@ export class SettingsView {
     exportChatButton.addEventListener("click", () => this.handlers?.onExportChat());
     clearAllChatsButton.addEventListener("click", () => this.handlers?.onClearAllChats());
     clearAllKeysButton.addEventListener("click", () => this.handlers?.onClearAllKeys());
+    sendShortcutSelect.addEventListener("change", () => {
+      const shortcut: SendShortcut = sendShortcutSelect.value === "mod-enter" ? "mod-enter" : "enter";
+      this.renderSendShortcut(shortcut);
+      this.handlers?.onSendShortcutChange(shortcut);
+    });
+    languageSelect.addEventListener("change", () => {
+      const language: UiLanguage = languageSelect.value === "zh-CN" ? "zh-CN" : "en";
+      this.handlers?.onLanguageChange(language);
+    });
 
     providerPreset.addEventListener("change", () => {
       if (providerPreset.value) baseUrlInput.value = providerPreset.value;
+      const defaultModel = providerPreset.selectedOptions[0]?.dataset.defaultModel;
+      if (defaultModel) modelInput.value = defaultModel;
+      this.updateModelSuggestions();
       endpointStatus.textContent = "";
       this.protectKeyFromOriginChange();
       removeEndpointButton.hidden = !providerPreset.selectedOptions[0]?.dataset.customEndpointId;
@@ -132,8 +152,14 @@ export class SettingsView {
     settingsToggle.setAttribute("aria-expanded", String(open));
   }
 
-  render(session: ChatSession, customEndpoints: SavedEndpoint[]): void {
+  render(
+    session: ChatSession,
+    customEndpoints: SavedEndpoint[],
+    sendShortcut: SendShortcut,
+    language: UiLanguage,
+  ): void {
     this.savedConfig = { ...session.config };
+    languageSelect.value = language;
     this.renderCustomEndpoints(customEndpoints);
     baseUrlInput.value = session.config.baseUrl;
     this.syncProviderPreset();
@@ -141,16 +167,17 @@ export class SettingsView {
     apiKeyInput.value = session.config.apiKey;
     this.keyOrigin = endpointOrigin(session.config.baseUrl);
     apiKeyInput.type = "password";
-    keyVisibilityButton.textContent = "Show";
-    keyVisibilityButton.setAttribute("aria-label", "Show API key");
+    keyVisibilityButton.textContent = t("Show");
+    keyVisibilityButton.setAttribute("aria-label", t("Show API key"));
     modelInput.value = session.config.model;
     systemPromptInput.value = session.config.systemPrompt;
     temperatureInput.value = session.config.temperature?.toString() ?? "";
     maxTokensInput.value = session.config.maxTokens?.toString() ?? "";
     topPInput.value = session.config.topP?.toString() ?? "";
     seedInput.value = session.config.seed?.toString() ?? "";
-    connectionStatus.textContent = session.connectionStatus;
+    connectionStatus.textContent = t(session.connectionStatus);
     this.setTesting(session.testingConnection);
+    this.renderSendShortcut(sendShortcut);
     this.renderModelOptions(session);
     this.updateDirtyState();
   }
@@ -167,7 +194,7 @@ export class SettingsView {
     for (const endpoint of customEndpoints) {
       const option = document.createElement("option");
       option.value = endpoint.baseUrl;
-      option.textContent = `Saved · ${endpoint.name}`;
+      option.textContent = t(`Saved · ${endpoint.name}`);
       option.dataset.customEndpointId = endpoint.id;
       providerPreset.append(option);
     }
@@ -180,6 +207,18 @@ export class SettingsView {
     );
     providerPreset.value = matchingOption?.value ?? "";
     removeEndpointButton.hidden = !matchingOption?.dataset.customEndpointId;
+    this.updateModelSuggestions();
+  }
+
+  private updateModelSuggestions(): void {
+    const models = providerPreset.selectedOptions[0]?.dataset.models;
+    modelSuggestions.replaceChildren(
+      ...(models ?? "").split(",").filter(Boolean).map((model) => {
+        const option = document.createElement("option");
+        option.value = model;
+        return option;
+      }),
+    );
   }
 
   renderModelOptions(session: ChatSession): void {
@@ -195,7 +234,7 @@ export class SettingsView {
         option.value = model;
         option.textContent =
           model === currentModel && !session.modelOptions.includes(model)
-            ? `${model} (custom)`
+            ? t("{model} (custom)", { model })
             : model;
         return option;
       }),
@@ -204,7 +243,7 @@ export class SettingsView {
     if (session.modelOptions.length > 0) {
       const customOption = document.createElement("option");
       customOption.value = "__custom_model__";
-      customOption.textContent = "Custom model…";
+      customOption.textContent = t("Custom model…");
       modelSelect.append(customOption);
 
       const selectedModel = currentModel || session.modelOptions[0] || "";
@@ -217,29 +256,35 @@ export class SettingsView {
       modelInput.hidden = false;
     }
 
-    modelStatus.textContent = session.loadingModels ? "Loading models…" : session.modelStatus;
+    modelStatus.textContent = session.loadingModels ? t("Loading models…") : t(session.modelStatus);
     loadModelsButton.disabled = session.loadingModels;
-    loadModelsButton.textContent = session.loadingModels ? "Loading" : "Load";
+    loadModelsButton.textContent = session.loadingModels ? t("Loading") : t("Load models");
     loadModelsButton.classList.toggle("is-loading", session.loadingModels);
     loadModelsButton.setAttribute("aria-busy", String(session.loadingModels));
     this.updateDirtyState();
   }
 
   setConnectionStatus(status: string): void {
-    connectionStatus.textContent = status;
+    connectionStatus.textContent = t(status);
   }
 
   setEndpointStatus(status: string): void {
-    endpointStatus.textContent = status;
+    endpointStatus.textContent = t(status);
   }
 
   setStorageStatus(status: string): void {
-    storageStatus.textContent = status;
+    storageStatus.textContent = t(status);
+  }
+
+  renderSendShortcut(shortcut: SendShortcut): void {
+    sendShortcutSelect.value = shortcut;
+    sendShortcutKey.textContent = shortcut === "mod-enter" ? "Ctrl/Cmd + Enter" : "Enter";
+    newlineShortcutKey.textContent = shortcut === "mod-enter" ? "Enter" : "Shift + Enter";
   }
 
   setTesting(testing: boolean): void {
     testConnectionButton.disabled = testing;
-    testConnectionButton.textContent = testing ? "Testing" : "Test";
+    testConnectionButton.textContent = testing ? t("Testing") : t("Test connection");
     testConnectionButton.classList.toggle("is-loading", testing);
     testConnectionButton.setAttribute("aria-busy", String(testing));
   }
@@ -318,7 +363,7 @@ export class SettingsView {
   private toggleKeyVisibility(): void {
     const show = apiKeyInput.type === "password";
     apiKeyInput.type = show ? "text" : "password";
-    keyVisibilityButton.textContent = show ? "Hide" : "Show";
-    keyVisibilityButton.setAttribute("aria-label", show ? "Hide API key" : "Show API key");
+    keyVisibilityButton.textContent = show ? t("Hide") : t("Show");
+    keyVisibilityButton.setAttribute("aria-label", show ? t("Hide API key") : t("Show API key"));
   }
 }

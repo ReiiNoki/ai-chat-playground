@@ -1,4 +1,5 @@
 import { NETWORK_ERROR, validateConfig } from "../domain/config";
+import { t } from "../lib/i18n";
 import type { ChatSession } from "../domain/types";
 import { ApiError, streamChat, type Message } from "../services/chat-api";
 import { HostPermissionService } from "../services/host-permission";
@@ -174,7 +175,7 @@ export class ChatController {
     }
     if (
       assistantIndex < session.messages.length - 1 &&
-      !window.confirm("Regenerating this response will remove the messages after it. Continue?")
+      !window.confirm(t("Regenerating this response will remove the messages after it. Continue?"))
     ) {
       return;
     }

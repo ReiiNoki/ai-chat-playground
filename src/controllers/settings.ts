@@ -1,3 +1,4 @@
+import { t, type UiLanguage } from "../lib/i18n";
 import {
   NETWORK_ERROR,
   parseBaseUrl,
@@ -8,7 +9,7 @@ import { isBuiltInEndpoint, normalizedBaseUrl } from "../domain/providers";
 import { ApiError, listModels, testChatConnection } from "../services/chat-api";
 import { HostPermissionService } from "../services/host-permission";
 import { PersistenceService } from "../services/persistence";
-import type { ApiConfig, SavedEndpoint } from "../services/storage";
+import type { ApiConfig, SavedEndpoint, SendShortcut } from "../services/storage";
 import { SidepanelStore } from "../stores/app";
 import { SettingsView } from "../views/settings-view";
 
@@ -21,6 +22,8 @@ type SettingsControllerCallbacks = {
   onExportChat: () => void;
   onClearAllChats: () => void;
   onClearAllKeys: () => void;
+  onSendShortcutChanged: (shortcut: SendShortcut) => void;
+  onLanguageChanged: (language: UiLanguage) => void;
 };
 
 export class SettingsController {
@@ -44,6 +47,8 @@ export class SettingsController {
       onSaveEndpoint: (baseUrl) => this.saveCurrentEndpoint(baseUrl),
       onRemoveEndpoint: (endpointId) => this.removeCurrentEndpoint(endpointId),
       onConnectionChange: (clearModels) => this.handleConnectionChange(clearModels),
+      onSendShortcutChange: (shortcut) => this.saveSendShortcut(shortcut),
+      onLanguageChange: (language) => this.saveLanguage(language),
       onExportChat: this.callbacks.onExportChat,
       onClearAllChats: this.callbacks.onClearAllChats,
       onClearAllKeys: this.callbacks.onClearAllKeys,
@@ -55,13 +60,20 @@ export class SettingsController {
       this.view.setOpen(true);
       return;
     }
-    if (this.view.isDirty() && !window.confirm("Discard unsaved settings?")) return;
+    if (this.view.isDirty() && !window.confirm(t("Discard unsaved settings?"))) return;
     this.cancelSettings();
   }
 
   private cancelSettings(): void {
     const session = this.store.activeChat;
-    if (session) this.view.render(session, this.store.customEndpoints);
+    if (session) {
+      this.view.render(
+        session,
+        this.store.customEndpoints,
+        this.store.sendShortcut,
+        this.store.language,
+      );
+    }
     this.view.setOpen(false);
   }
 
@@ -99,6 +111,27 @@ export class SettingsController {
     } finally {
       this.saveInProgress = false;
     }
+  }
+
+  private saveLanguage(language: UiLanguage): void {
+    this.store.setLanguage(language);
+    this.callbacks.onLanguageChanged(language);
+    void this.persistence.save().catch(() => {
+      this.callbacks.notify("Could not save language preference.", "error");
+      this.callbacks.reportStorageError();
+    });
+  }
+
+  private saveSendShortcut(shortcut: SendShortcut): void {
+    this.store.setSendShortcut(shortcut);
+    this.callbacks.onSendShortcutChanged(shortcut);
+    void this.persistence
+      .save()
+      .then(() => this.callbacks.notify("Keyboard shortcut saved.", "success"))
+      .catch(() => {
+        this.callbacks.notify("Could not save keyboard shortcut.", "error");
+        this.callbacks.reportStorageError();
+      });
   }
 
   private handleConnectionChange(clearModels: boolean): void {

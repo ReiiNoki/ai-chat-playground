@@ -1,3 +1,5 @@
+import type { UiLanguage } from "../lib/i18n";
+
 export type ApiConfig = {
   baseUrl: string;
   apiKey: string;
@@ -27,10 +29,14 @@ export type SavedEndpoint = {
   baseUrl: string;
 };
 
+export type SendShortcut = "enter" | "mod-enter";
+
 export type SavedState = {
   chats: SavedChat[];
   activeChatId: string;
   customEndpoints: SavedEndpoint[];
+  sendShortcut: SendShortcut;
+  language: UiLanguage;
 };
 
 const DEFAULT_CONFIG: ApiConfig = {
@@ -48,6 +54,8 @@ const STORAGE_KEYS = [
   "chats",
   "activeChatId",
   "customEndpoints",
+  "sendShortcut",
+  "language",
   "baseUrl",
   "apiKey",
   "model",
@@ -110,6 +118,8 @@ function readConfig(value: unknown, fallback: ApiConfig): ApiConfig {
 
 export async function loadState(): Promise<SavedState> {
   const stored = await chrome.storage.local.get(STORAGE_KEYS);
+  const sendShortcut: SendShortcut = stored.sendShortcut === "mod-enter" ? "mod-enter" : "enter";
+  const language: UiLanguage = stored.language === "zh-CN" ? "zh-CN" : "en";
   const chats = Array.isArray(stored.chats)
     ? stored.chats.flatMap((value): SavedChat[] => {
         if (!value || typeof value !== "object") return [];
@@ -149,7 +159,7 @@ export async function loadState(): Promise<SavedState> {
     const activeChatId = chats.some((chat) => chat.id === requestedActiveId)
       ? requestedActiveId
       : (chats[0]?.id ?? "");
-    return { chats, activeChatId, customEndpoints };
+    return { chats, activeChatId, customEndpoints, sendShortcut, language };
   }
 
   // Migrate the original single-configuration storage format.
@@ -159,6 +169,8 @@ export async function loadState(): Promise<SavedState> {
     chats: [{ id, config: legacyConfig, messages: [] }],
     activeChatId: id,
     customEndpoints,
+    sendShortcut,
+    language,
   };
 }
 
@@ -167,5 +179,7 @@ export async function saveState(state: SavedState): Promise<void> {
     chats: state.chats,
     activeChatId: state.activeChatId,
     customEndpoints: state.customEndpoints,
+    sendShortcut: state.sendShortcut,
+    language: state.language,
   });
 }

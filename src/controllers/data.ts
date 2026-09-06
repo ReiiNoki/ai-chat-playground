@@ -1,4 +1,5 @@
 import type { ChatSession } from "../domain/types";
+import { t } from "../lib/i18n";
 import { exportChat, removeLegacyApiKey, storageUsage } from "../services/local-data";
 import { PersistenceService } from "../services/persistence";
 import { SidepanelStore } from "../stores/app";
@@ -36,7 +37,7 @@ export class DataController {
   }
 
   clearAllChatMessages(): void {
-    if (!window.confirm("Clear the messages in every chat? This cannot be undone.")) return;
+    if (!window.confirm(t("Clear the messages in every chat? This cannot be undone."))) return;
     for (const session of this.store.chats) {
       session.mutationVersion += 1;
       if (session.controller) this.callbacks.stopGenerating(session);
@@ -61,7 +62,7 @@ export class DataController {
   }
 
   clearAllApiKeys(): void {
-    if (!window.confirm("Remove every saved API key?")) return;
+    if (!window.confirm(t("Remove every saved API key?"))) return;
     for (const session of this.store.chats) session.config.apiKey = "";
     this.view.setApiKey("");
     void Promise.all([this.persistence.save(), removeLegacyApiKey()])

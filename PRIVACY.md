@@ -13,6 +13,7 @@ The extension may store the following data in `chrome.storage.local` in the user
 - System prompts
 - Chat messages and compatible reasoning output
 - Saved custom endpoints and open chat tabs
+- Interface language and keyboard shortcut preferences
 
 API keys are stored locally as plain text within the extension's isolated Chrome storage area. Users should avoid using keys with unnecessary privileges and may remove all saved keys from the extension's Local data settings.
 

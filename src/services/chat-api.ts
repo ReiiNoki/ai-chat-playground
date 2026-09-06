@@ -139,9 +139,25 @@ function readWithTimeout(
   });
 }
 
-function requestHeaders(apiKey: string, includeJson = false): Record<string, string> {
+const API_KEY_HEADER_HOSTS = new Set(["api.xiaomimimo.com"]);
+
+function authHeaderName(baseUrl: string): "Authorization" | "api-key" {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    if (API_KEY_HEADER_HOSTS.has(host) || host.endsWith(".xiaomimimo.com")) return "api-key";
+  } catch {
+    // Fall through to the default Authorization header.
+  }
+  return "Authorization";
+}
+
+function requestHeaders(baseUrl: string, apiKey: string, includeJson = false): Record<string, string> {
   const headers: Record<string, string> = {};
-  if (apiKey.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
+  const trimmed = apiKey.trim();
+  if (trimmed) {
+    const header = authHeaderName(baseUrl);
+    headers[header] = header === "api-key" ? trimmed : `Bearer ${trimmed}`;
+  }
   if (includeJson) headers["Content-Type"] = "application/json";
   return headers;
 }
@@ -242,7 +258,7 @@ export async function listModels(
       async (requestSignal) => {
         const response = await fetchWithTimeout(
           endpointFor(baseUrl, "models"),
-          { headers: requestHeaders(apiKey) },
+          { headers: requestHeaders(baseUrl, apiKey) },
           requestSignal,
         );
 
@@ -301,7 +317,7 @@ export async function testChatConnection(config: ApiConfig, signal: AbortSignal)
           endpointFor(config.baseUrl, "chat/completions"),
           {
             method: "POST",
-            headers: requestHeaders(config.apiKey, true),
+            headers: requestHeaders(config.baseUrl, config.apiKey, true),
             body: JSON.stringify({
               model: config.model,
               messages: [{ role: "user", content: "Reply with OK." }],
@@ -345,7 +361,7 @@ async function streamAttempt({ config, messages, signal, onDelta }: StreamOption
         endpointFor(config.baseUrl, "chat/completions"),
         {
           method: "POST",
-          headers: requestHeaders(config.apiKey, true),
+          headers: requestHeaders(config.baseUrl, config.apiKey, true),
           body: JSON.stringify({
             model: config.model,
             messages: [

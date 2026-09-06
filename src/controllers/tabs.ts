@@ -1,4 +1,5 @@
 import { isBuiltInEndpoint, normalizedBaseUrl } from "../domain/providers";
+import { t } from "../lib/i18n";
 import { FaviconService } from "../services/favicon";
 import { HostPermissionService } from "../services/host-permission";
 import { PersistenceService } from "../services/persistence";
@@ -110,6 +111,6 @@ export class TabsController {
 
   private canLeaveActiveChat(): boolean {
     if (!this.settingsView.isOpen() || !this.settingsView.isDirty()) return true;
-    return window.confirm("Discard unsaved settings and leave this chat?");
+    return window.confirm(t("Discard unsaved settings and leave this chat?"));
   }
 }

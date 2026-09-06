@@ -1,5 +1,6 @@
+import type { UiLanguage } from "../lib/i18n";
 import type { Message } from "../services/chat-api";
-import type { ApiConfig, SavedEndpoint } from "../services/storage";
+import type { ApiConfig, SavedEndpoint, SendShortcut } from "../services/storage";
 
 export type ChatSession = {
   id: string;
@@ -26,5 +27,7 @@ export type SidepanelState = {
   chats: ChatSession[];
   activeChatId: string;
   customEndpoints: SavedEndpoint[];
+  sendShortcut: SendShortcut;
+  language: UiLanguage;
   ready: boolean;
 };

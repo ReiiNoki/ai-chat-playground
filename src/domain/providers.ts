@@ -8,6 +8,7 @@ import openRouterLogo from "../assets/providers/openrouter.svg?url";
 import qwenLogo from "../assets/providers/qwen.svg?url";
 import siliconFlowLogo from "../assets/providers/siliconflow.svg?url";
 import xAiLogo from "../assets/providers/xai.svg?url";
+import xiaomiMimoLogo from "../assets/providers/xiaomi-mimo.png?url";
 import zhipuLogo from "../assets/providers/zhipu.svg?url";
 import type { ChatSession } from "./types";
 import type { SavedEndpoint } from "../services/storage";
@@ -21,7 +22,7 @@ export type ProviderLogo = {
 type ProviderDefinition = {
   short: string;
   full: string;
-  logo: ProviderLogo;
+  logo?: ProviderLogo;
 };
 
 const PROVIDERS = new Map<string, ProviderDefinition>([
@@ -52,6 +53,10 @@ const PROVIDERS = new Map<string, ProviderDefinition>([
   [
     "https://api.minimaxi.com/v1",
     { short: "MM", full: "MiniMax China", logo: { src: minimaxLogo } },
+  ],
+  [
+    "https://api.xiaomimimo.com/v1",
+    { short: "MiMo", full: "Xiaomi MiMo", logo: { src: xiaomiMimoLogo } },
   ],
   [
     "https://api.deepseek.com/v1",

@@ -15,6 +15,7 @@
   --accent-hover: #000000;
   --accent-text: #ffffff;
   --danger: #c73e3e;
+  --warning: #9a6500;
   --focus: rgba(31, 31, 31, 0.16);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.04);
 }
@@ -57,22 +58,6 @@ button:disabled {
   background: var(--bg);
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 56px;
-  padding: 0 14px 0 18px;
-}
-
-.app-header h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-
 .icon-button,
 .small-button,
 .text-button,
@@ -102,8 +87,7 @@ button:disabled {
   align-items: center;
   gap: 4px;
   min-height: 44px;
-  padding: 6px 9px;
-  border-top: 1px solid var(--border);
+  padding: 7px 9px 6px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -251,7 +235,7 @@ body.settings-open .settings {
   margin-bottom: 9px;
 }
 
-body.settings-open .chat,
+body.settings-open .chat-shell,
 body.settings-open .composer,
 body.settings-open .scroll-bottom-button {
   display: none;
@@ -259,22 +243,98 @@ body.settings-open .scroll-bottom-button {
 
 .settings form {
   display: grid;
+  gap: 10px;
+}
+
+.settings-section {
+  display: grid;
   gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-section legend,
+.advanced-settings summary,
+.shortcuts-settings summary,
+.data-settings summary {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .advanced-settings,
+.shortcuts-settings,
 .data-settings {
-  margin-top: 8px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .advanced-settings summary,
+.shortcuts-settings summary,
 .data-settings summary {
-  color: var(--text);
   cursor: pointer;
+}
+
+.shortcuts-settings[open] > summary {
+  margin-bottom: 0;
+}
+
+.settings .shortcuts-settings > .shortcuts-body {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.settings .shortcuts-settings > .shortcuts-body > label {
+  display: block;
+  margin: 2px 1px 0;
+}
+
+.settings .shortcuts-settings > .shortcuts-body > select {
+  margin: 0;
+}
+
+.shortcuts-list {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 2px;
+}
+
+.shortcuts-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.shortcuts-list div:last-child {
+  border-bottom: 0;
+}
+
+.shortcuts-list dt {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--bg);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.shortcuts-list dd {
+  margin: 0;
+  color: var(--muted);
   font-size: 13px;
-  font-weight: 600;
+  text-align: right;
 }
 
 .advanced-grid {
@@ -305,6 +365,11 @@ body.settings-open .scroll-bottom-button {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
+}
+
+.label-note {
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 input,
@@ -362,6 +427,15 @@ button:focus-visible {
   background: var(--subtle);
 }
 
+.danger-button {
+  color: var(--danger);
+}
+
+.danger-button:hover {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
 .form-status {
   min-height: 15px;
   padding-left: 1px;
@@ -370,7 +444,7 @@ button:focus-visible {
 }
 
 .settings-change-status {
-  color: var(--danger);
+  color: var(--warning);
   font-weight: 600;
 }
 
@@ -424,10 +498,16 @@ button:focus-visible {
   background: var(--accent-hover);
 }
 
+.chat-shell {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .chat {
   flex: 1 1 auto;
   min-height: 0;
-  padding: 22px max(16px, calc(50% - 380px)) 18px;
+  padding: 22px max(clamp(11px, 4vw, 16px), calc(50% - 380px)) 18px;
   overflow-y: auto;
 }
 
@@ -455,8 +535,53 @@ button:focus-visible {
   margin: 0;
 }
 
-.empty-state .primary-button {
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
   margin-top: 16px;
+}
+
+.empty-state .primary-button,
+.empty-state .small-button {
+  min-height: 36px;
+}
+
+.prompt-button {
+  max-width: 100%;
+}
+
+.chat-summary {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 18px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  gap: 7px;
+}
+
+.chat-summary:hover {
+  color: var(--text);
+  background: var(--subtle);
+}
+
+.chat-summary-label {
+  flex: 0 0 auto;
+  font-weight: 650;
+}
+
+.chat-summary-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message {
@@ -478,10 +603,14 @@ button:focus-visible {
 }
 
 .message-role {
+  max-width: 100%;
   margin-bottom: 6px;
+  overflow: hidden;
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message[data-role="user"] .message-role {
@@ -662,14 +791,37 @@ button:focus-visible {
   text-align: left;
 }
 
+.waiting-indicator,
+.retry-message {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.waiting-indicator::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+  opacity: 0.65;
+  animation: waiting-pulse 1s ease-in-out infinite;
+}
+
+@keyframes waiting-pulse {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.82);
+  }
+}
+
 .retry-message {
   margin-top: 12px;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--muted);
   background: var(--surface);
-  font-size: 13px;
   text-align: center;
 }
 
@@ -709,10 +861,10 @@ button:focus-visible {
 
 .composer {
   flex: 0 0 auto;
-  width: calc(100% - 24px);
+  width: calc(100% - clamp(16px, 6vw, 24px));
   max-width: 780px;
   align-self: center;
-  margin: 0 12px 12px;
+  margin: 0 clamp(8px, 3vw, 12px) clamp(8px, 3vw, 12px);
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -720,10 +872,15 @@ button:focus-visible {
   box-shadow: var(--shadow);
 }
 
+.composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus), var(--shadow);
+}
+
 #message-input {
-  min-height: 76px;
-  max-height: 220px;
-  padding: 9px 10px;
+  min-height: 48px;
+  max-height: clamp(80px, 20vh, 180px);
+  padding: 8px 10px;
   border: 0;
   border-radius: 8px;
   overflow-y: hidden;
@@ -742,14 +899,21 @@ button:focus-visible {
   margin-top: 4px;
 }
 
-.composer-hint {
-  flex: 1 1 auto;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.composer-secondary-actions,
+.composer-primary-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.composer-secondary-actions {
+  gap: 2px;
+}
+
+.composer-primary-actions {
+  min-width: 0;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .text-button {
@@ -771,7 +935,7 @@ button:focus-visible {
 .toast-region {
   position: fixed;
   right: 12px;
-  bottom: 112px;
+  bottom: 96px;
   z-index: 20;
   display: flex;
   width: min(320px, calc(100% - 24px));
@@ -819,17 +983,9 @@ button:focus-visible {
 }
 
 @media (max-width: 360px) {
-  .chat {
-    padding: 18px 11px 14px;
-  }
-
   .message + .message,
   .error-message {
     margin-top: 18px;
-  }
-
-  .message[data-role="user"] {
-    max-width: calc(100% - 8px);
   }
 
   .message-content,
@@ -859,21 +1015,6 @@ button:focus-visible {
 
   .advanced-grid {
     grid-template-columns: minmax(82px, 0.9fr) minmax(0, 1.1fr);
-  }
-
-  .composer {
-    width: calc(100% - 16px);
-    margin-right: 8px;
-    margin-bottom: 8px;
-    margin-left: 8px;
-  }
-
-  #message-input {
-    min-height: 68px;
-  }
-
-  .composer-hint {
-    display: none;
   }
 
   .toast-region {
@@ -921,6 +1062,7 @@ button:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .small-button.is-loading::before,
+  .waiting-indicator::before,
   .toast,
   .toast.is-leaving {
     animation: none;
@@ -942,6 +1084,7 @@ button:focus-visible {
     --accent-hover: #ffffff;
     --accent-text: #171716;
     --danger: #ef7770;
+    --warning: #e0a84a;
     --focus: rgba(240, 240, 237, 0.18);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.16);
   }

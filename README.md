@@ -30,6 +30,7 @@ AI Chat Playground 适合快速进行 API 接口测试。它不提供 AI 模型�
 - GLM / 智谱
 - Qwen / 通义千问
 - MiniMax
+- Xiaomi MiMo / 小米
 - DeepSeek
 - Moonshot / Kimi
 - SiliconFlow / 硅基流动

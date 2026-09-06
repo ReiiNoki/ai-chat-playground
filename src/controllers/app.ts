@@ -1,4 +1,5 @@
 import { tabLabel } from "../domain/providers";
+import { applyDocumentTranslations, setLanguage } from "../lib/i18n";
 import { HostPermissionService } from "../services/host-permission";
 import { PersistenceService } from "../services/persistence";
 import { SidepanelStore } from "../stores/app";
@@ -69,6 +70,14 @@ export class AppController {
         onExportChat: () => this.data.exportCurrentChat(),
         onClearAllChats: () => this.data.clearAllChatMessages(),
         onClearAllKeys: () => this.data.clearAllApiKeys(),
+        onSendShortcutChanged: (shortcut) => this.chatView.setSendShortcut(shortcut),
+        onLanguageChanged: (language) => {
+          setLanguage(language);
+          this.tabs.render();
+          this.renderChat();
+          this.chatView.setGenerating(Boolean(this.store.activeChat?.controller));
+          applyDocumentTranslations();
+        },
       },
     );
 
@@ -95,8 +104,11 @@ export class AppController {
       this.store.initializeFallback("Could not load saved settings.");
     } finally {
       this.store.setReady(true);
+      setLanguage(this.store.language);
+      this.chatView.setSendShortcut(this.store.sendShortcut);
       this.setReady(true);
       this.renderActiveChat();
+      applyDocumentTranslations();
       this.chatView.focusComposer();
     }
   }
@@ -139,7 +151,12 @@ export class AppController {
     this.renderChat();
     if (!session) return;
 
-    this.settingsView.render(session, this.store.customEndpoints);
+    this.settingsView.render(
+      session,
+      this.store.customEndpoints,
+      this.store.sendShortcut,
+      this.store.language,
+    );
     this.chatView.setDraft(session.draft);
     this.chatView.setGenerating(session.controller !== null);
     void this.data.refreshStorageUsage();

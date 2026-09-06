@@ -1,9 +1,11 @@
+import type { UiLanguage } from "../lib/i18n";
 import type { Message } from "../services/chat-api";
 import {
   createDefaultConfig,
   type ApiConfig,
   type SavedEndpoint,
   type SavedState,
+  type SendShortcut,
 } from "../services/storage";
 import type { ChatSession, SidepanelState } from "../domain/types";
 
@@ -39,6 +41,8 @@ export class SidepanelStore {
     chats: [],
     activeChatId: "",
     customEndpoints: [],
+    sendShortcut: "enter",
+    language: "en",
     ready: false,
   };
 
@@ -54,12 +58,28 @@ export class SidepanelStore {
     return this.state.customEndpoints;
   }
 
+  get sendShortcut(): SendShortcut {
+    return this.state.sendShortcut;
+  }
+
+  get language(): UiLanguage {
+    return this.state.language;
+  }
+
   get ready(): boolean {
     return this.state.ready;
   }
 
   get activeChat(): ChatSession | undefined {
     return this.findChat(this.state.activeChatId);
+  }
+
+  setSendShortcut(shortcut: SendShortcut): void {
+    this.state.sendShortcut = shortcut;
+  }
+
+  setLanguage(language: UiLanguage): void {
+    this.state.language = language;
   }
 
   setReady(ready: boolean): void {
@@ -72,6 +92,8 @@ export class SidepanelStore {
     );
     this.state.activeChatId = saved.activeChatId;
     this.state.customEndpoints = saved.customEndpoints.map((endpoint) => ({ ...endpoint }));
+    this.state.sendShortcut = saved.sendShortcut;
+    this.state.language = saved.language;
 
     if (this.state.chats.length === 0) this.state.chats.push(createChat());
     if (!this.activeChat) this.state.activeChatId = this.state.chats[0]?.id ?? "";
@@ -83,6 +105,8 @@ export class SidepanelStore {
     this.state.chats = [session];
     this.state.activeChatId = session.id;
     this.state.customEndpoints = [];
+    this.state.sendShortcut = "enter";
+    this.state.language = "en";
     return session;
   }
 
@@ -137,6 +161,8 @@ export class SidepanelStore {
       })),
       activeChatId: this.state.activeChatId,
       customEndpoints: this.state.customEndpoints.map((endpoint) => ({ ...endpoint })),
+      sendShortcut: this.state.sendShortcut,
+      language: this.state.language,
     };
   }
 }

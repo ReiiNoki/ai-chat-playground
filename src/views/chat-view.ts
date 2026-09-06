@@ -1,6 +1,8 @@
 import type { ChatSession } from "../domain/types";
+import { t } from "../lib/i18n";
 import { renderMarkdown } from "../lib/markdown";
 import type { Message, StreamDelta } from "../services/chat-api";
+import type { SendShortcut } from "../services/storage";
 import {
   chatElement,
   clearButton,
@@ -42,6 +44,7 @@ export class ChatView {
   private handlers: ChatViewHandlers | null = null;
   private ready = false;
   private generating = false;
+  private sendShortcut: SendShortcut = "enter";
   private streamingRenderTimer: number | null = null;
   private pendingStreamingRender: PendingStreamingRender | null = null;
 
@@ -57,10 +60,15 @@ export class ChatView {
     });
 
     messageInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-        event.preventDefault();
-        this.handlers?.onSubmit();
-      }
+      if (event.key !== "Enter" || event.isComposing) return;
+
+      const shouldSend = this.sendShortcut === "mod-enter"
+        ? (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey
+        : !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey;
+      if (!shouldSend) return;
+
+      event.preventDefault();
+      this.handlers?.onSubmit();
     });
 
     chatElement.addEventListener("scroll", () => {
@@ -80,6 +88,15 @@ export class ChatView {
 
   bind(handlers: ChatViewHandlers): void {
     this.handlers = handlers;
+  }
+
+  setSendShortcut(shortcut: SendShortcut): void {
+    this.sendShortcut = shortcut;
+    if (!this.generating) {
+      sendButton.title = shortcut === "mod-enter"
+        ? t("Send message (Ctrl/Cmd+Enter)")
+        : t("Send message (Enter)");
+    }
   }
 
   setReady(ready: boolean): void {
@@ -110,10 +127,14 @@ export class ChatView {
 
   setGenerating(generating: boolean): void {
     this.generating = generating;
-    sendButton.textContent = generating ? "Stop" : "Send";
+    sendButton.textContent = generating ? t("Stop") : t("Send");
     sendButton.classList.toggle("is-stop", generating);
-    sendButton.setAttribute("aria-label", generating ? "Stop generating" : "Send message");
-    sendButton.title = generating ? "Stop generating (Esc)" : "Send message (Enter)";
+    sendButton.setAttribute("aria-label", generating ? t("Stop generating") : t("Send message"));
+    sendButton.title = generating
+      ? t("Stop generating (Esc)")
+      : this.sendShortcut === "mod-enter"
+        ? t("Send message (Ctrl/Cmd+Enter)")
+        : t("Send message (Enter)");
     this.syncPrimaryButton();
   }
 
@@ -137,6 +158,8 @@ export class ChatView {
       return;
     }
 
+    if (emptyState?.configured) chatElement.append(this.createChatSummary(emptyState));
+
     session.messages.forEach((message, index) => {
       chatElement.append(this.createMessage(session, message, index));
     });
@@ -144,7 +167,7 @@ export class ChatView {
     if (session.retryStatus) {
       const status = document.createElement("div");
       status.className = "retry-message";
-      status.textContent = session.retryStatus;
+      status.textContent = t(session.retryStatus);
       chatElement.append(status);
     }
 
@@ -242,29 +265,75 @@ export class ChatView {
     empty.className = "empty-state";
 
     const title = document.createElement("h2");
-    title.textContent = info?.configured ? "Start a conversation" : "Configure this chat";
+    title.textContent = info?.configured ? t("Start a conversation") : t("Configure this chat");
 
     const description = document.createElement("p");
-    description.textContent = info
+    description.textContent = info?.configured
       ? `${info.provider} · ${info.model}`
-      : "Choose an API endpoint and model to get started.";
+      : t("Choose an API endpoint and model. API keys stay in local Chrome storage.");
+
+    const actions = document.createElement("div");
+    actions.className = "empty-actions";
 
     const settingsButton = document.createElement("button");
-    settingsButton.className = "primary-button";
+    settingsButton.className = info?.configured ? "small-button" : "primary-button";
     settingsButton.type = "button";
-    settingsButton.textContent = "Open settings";
+    settingsButton.textContent = info?.configured ? t("Edit settings") : t("Configure API");
     settingsButton.addEventListener("click", () => this.handlers?.onOpenSettings());
+    actions.append(settingsButton);
 
-    empty.append(title, description, settingsButton);
+    if (info?.configured) {
+      const prompts = ["Reply with a short hello.", "Show a small Markdown example."];
+      for (const prompt of prompts) {
+        const promptButton = document.createElement("button");
+        promptButton.className = "small-button prompt-button";
+        promptButton.type = "button";
+        promptButton.textContent = t(prompt.replace(/\.$/, ""));
+        promptButton.addEventListener("click", () => {
+          this.setDraft(t(prompt));
+          this.focusComposer();
+        });
+        actions.append(promptButton);
+      }
+    }
+
+    empty.append(title, description, actions);
     return empty;
+  }
+
+  private createChatSummary(info: EmptyStateInfo): HTMLElement {
+    const summary = document.createElement("button");
+    summary.className = "chat-summary";
+    summary.type = "button";
+    summary.title = t("Open settings");
+    summary.addEventListener("click", () => this.handlers?.onOpenSettings());
+
+    const label = document.createElement("span");
+    label.className = "chat-summary-label";
+    label.textContent = t("Current API");
+
+    const value = document.createElement("span");
+    value.className = "chat-summary-value";
+    value.textContent = `${info.provider} · ${info.model}`;
+
+    summary.append(label, value);
+    return summary;
   }
 
   private resizeComposer(): void {
     messageInput.style.height = "auto";
     messageInput.style.overflowY = "hidden";
-    const configuredMaxHeight = Number.parseFloat(getComputedStyle(messageInput).maxHeight);
-    const maxHeight = Number.isFinite(configuredMaxHeight) ? configuredMaxHeight : 220;
-    const nextHeight = Math.min(messageInput.scrollHeight, maxHeight);
+
+    const styles = getComputedStyle(messageInput);
+    const configuredMinHeight = Number.parseFloat(styles.minHeight);
+    const configuredMaxHeight = Number.parseFloat(styles.maxHeight);
+    const minHeight = Number.isFinite(configuredMinHeight) ? configuredMinHeight : 48;
+    const proportionalMaxHeight = Math.min(Math.max(window.innerHeight * 0.2, 80), 180);
+    const maxHeight = Number.isFinite(configuredMaxHeight)
+      ? Math.min(configuredMaxHeight, proportionalMaxHeight)
+      : proportionalMaxHeight;
+    const nextHeight = Math.max(minHeight, Math.min(messageInput.scrollHeight, maxHeight));
+
     messageInput.style.height = `${Math.ceil(nextHeight)}px`;
     messageInput.style.overflowY = messageInput.scrollHeight > maxHeight ? "auto" : "hidden";
   }
@@ -280,13 +349,17 @@ export class ChatView {
 
     const role = document.createElement("div");
     role.className = "message-role";
-    role.textContent = message.role === "user" ? "User" : "Assistant";
+    role.textContent = message.role === "user" ? t("You") : session.config.model.trim() || t("Assistant");
 
     const content = document.createElement("div");
     content.className = "message-content";
     if (message.role === "assistant") {
       content.classList.add("assistant-content");
-      this.renderInteractiveMarkdown(content, message.content);
+      if (message.content) {
+        this.renderInteractiveMarkdown(content, message.content);
+      } else if (session.controller) {
+        content.append(this.createWaitingIndicator());
+      }
     } else {
       content.textContent = message.content;
     }
@@ -303,6 +376,13 @@ export class ChatView {
     return container;
   }
 
+  private createWaitingIndicator(): HTMLElement {
+    const indicator = document.createElement("div");
+    indicator.className = "waiting-indicator";
+    indicator.textContent = t("Waiting for response…");
+    return indicator;
+  }
+
   private createMessageActions(
     session: ChatSession,
     message: Message,
@@ -314,7 +394,7 @@ export class ChatView {
     const copyButton = document.createElement("button");
     copyButton.className = "message-action";
     copyButton.type = "button";
-    copyButton.textContent = "Copy";
+    copyButton.textContent = t("Copy");
     copyButton.addEventListener("click", () => {
       void this.copyWithFeedback(copyButton, message.content || message.reasoning || "");
     });
@@ -324,7 +404,7 @@ export class ChatView {
       const regenerateButton = document.createElement("button");
       regenerateButton.className = "message-action";
       regenerateButton.type = "button";
-      regenerateButton.textContent = "Regenerate";
+      regenerateButton.textContent = t("Regenerate");
       regenerateButton.addEventListener("click", () => {
         this.handlers?.onRegenerate(session.id, index);
       });
@@ -341,7 +421,7 @@ export class ChatView {
     details.className = "reasoning-block";
 
     const summary = document.createElement("summary");
-    summary.textContent = "Thinking";
+    summary.textContent = t("Thinking");
 
     const content = document.createElement("div");
     content.className = "message-content reasoning-content";
@@ -362,11 +442,11 @@ export class ChatView {
 
     const role = document.createElement("div");
     role.className = "message-role";
-    role.textContent = "Error";
+    role.textContent = t("Error");
 
     const content = document.createElement("div");
     content.className = "error-content";
-    content.textContent = error;
+    content.textContent = t(error);
 
     container.append(role, content);
     return container;
@@ -380,20 +460,20 @@ export class ChatView {
 
   private notifyCopyResult(success: boolean): void {
     this.handlers?.onNotify(
-      success ? "Copied to clipboard." : "Copy failed.",
+      success ? t("Copied to clipboard.") : t("Copy failed."),
       success ? "success" : "error",
     );
   }
 
   private async copyWithFeedback(button: HTMLButtonElement, text: string): Promise<void> {
     if (!text) return;
-    const originalLabel = button.textContent ?? "Copy";
+    const originalLabel = button.textContent ?? t("Copy");
     try {
       await navigator.clipboard.writeText(text);
-      button.textContent = "Copied";
+      button.textContent = t("Copied");
       this.notifyCopyResult(true);
     } catch {
-      button.textContent = "Failed";
+      button.textContent = t("Failed");
       this.notifyCopyResult(false);
     }
     window.setTimeout(() => {

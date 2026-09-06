@@ -30,6 +30,7 @@ Built-in presets are available for:
 - GLM / Zhipu
 - Qwen
 - MiniMax
+- Xiaomi MiMo
 - DeepSeek
 - Moonshot / Kimi
 - SiliconFlow

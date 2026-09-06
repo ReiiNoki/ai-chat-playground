@@ -1,4 +1,5 @@
 import type { ChatSession } from "../domain/types";
+import { t } from "../lib/i18n";
 import { normalizedBaseUrl, tabLabel, type ProviderLogo } from "../domain/providers";
 import type { SavedEndpoint } from "../services/storage";
 import { newChatButton, tabsList } from "./elements";
@@ -66,8 +67,8 @@ export class TabsView {
       closeButton.className = "tab-close";
       closeButton.type = "button";
       closeButton.textContent = "×";
-      closeButton.title = "Close chat";
-      closeButton.setAttribute("aria-label", `Close ${label.providerFull} · ${label.model}`);
+      closeButton.title = t("Close chat");
+      closeButton.setAttribute("aria-label", `${t("Close chat")}: ${label.providerFull} · ${label.model}`);
       closeButton.addEventListener("click", () => this.handlers?.onClose(session.id));
 
       container.append(selectButton, closeButton);
