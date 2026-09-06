@@ -1,6 +1,5 @@
 import deepSeekLogo from "../assets/providers/deepseek.svg?url";
 import geminiLogo from "../assets/providers/gemini.svg?url";
-import groqLogo from "../assets/providers/groq.svg?url";
 import minimaxLogo from "../assets/providers/minimax.svg?url";
 import moonshotLogo from "../assets/providers/moonshot.svg?url";
 import openAiLogo from "../assets/providers/openai.svg?url";
@@ -69,10 +68,6 @@ const PROVIDERS = new Map<string, ProviderDefinition>([
   [
     "https://api.siliconflow.cn/v1",
     { short: "SF", full: "SiliconFlow / 硅基流动", logo: { src: siliconFlowLogo } },
-  ],
-  [
-    "https://api.groq.com/openai/v1",
-    { short: "Groq", full: "Groq", logo: { src: groqLogo, monochrome: true } },
   ],
   [
     "https://generativelanguage.googleapis.com/v1beta/openai",
