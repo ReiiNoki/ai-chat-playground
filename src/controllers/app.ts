@@ -1,5 +1,9 @@
 import { tabLabel } from "../domain/providers";
-import { applyDocumentTranslations, setLanguage } from "../lib/i18n";
+import {
+  applyDocumentTranslations,
+  initializeDocumentTranslations,
+  setLanguage,
+} from "../lib/i18n";
 import { HostPermissionService } from "../services/host-permission";
 import { PersistenceService } from "../services/persistence";
 import { SidepanelStore } from "../stores/app";
@@ -26,6 +30,7 @@ export class AppController {
   private readonly tabs: TabsController;
 
   constructor() {
+    initializeDocumentTranslations();
     this.persistence = new PersistenceService(
       () => this.store.toSavedState(),
       () => this.reportStorageError(),
@@ -73,6 +78,8 @@ export class AppController {
         onSendShortcutChanged: (shortcut) => this.chatView.setSendShortcut(shortcut),
         onLanguageChanged: (language) => {
           setLanguage(language);
+          const session = this.store.activeChat;
+          if (session) this.settingsView.refreshLanguage(session);
           this.tabs.render();
           this.renderChat();
           this.chatView.setGenerating(Boolean(this.store.activeChat?.controller));

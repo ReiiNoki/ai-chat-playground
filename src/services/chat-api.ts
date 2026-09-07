@@ -31,6 +31,8 @@ const MAX_RETRIES = 2;
 const MODEL_REQUEST_TIMEOUT_MS = 30_000;
 const TEST_REQUEST_TIMEOUT_MS = 60_000;
 const STREAM_IDLE_TIMEOUT_MS = 120_000;
+const ERROR_RESPONSE_TIMEOUT_MS = 15_000;
+const MAX_ERROR_RESPONSE_BYTES = 64 * 1024;
 const MAX_SSE_BUFFER_BYTES = 1024 * 1024;
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
@@ -114,29 +116,67 @@ async function fetchWithTimeout(
 
 function readWithTimeout(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  signal: AbortSignal,
+  signal?: AbortSignal,
+  timeoutMs = STREAM_IDLE_TIMEOUT_MS,
+  timeoutMessage = "The streaming response timed out.",
 ): Promise<ReadableStreamReadResult<Uint8Array>> {
   return new Promise((resolve, reject) => {
-    if (signal.aborted) {
+    if (signal?.aborted) {
       reject(signal.reason);
       return;
     }
 
-    const idleTimeout = window.setTimeout(
-      () => reject(new ApiError("The streaming response timed out.")),
-      STREAM_IDLE_TIMEOUT_MS,
+    const timeout = window.setTimeout(
+      () => reject(new ApiError(timeoutMessage)),
+      timeoutMs,
     );
-    const onAbort = (): void => reject(signal.reason);
+    const onAbort = (): void => reject(signal?.reason);
 
-    signal.addEventListener("abort", onAbort, { once: true });
+    signal?.addEventListener("abort", onAbort, { once: true });
     void reader
       .read()
       .then(resolve, reject)
       .finally(() => {
-        window.clearTimeout(idleTimeout);
-        signal.removeEventListener("abort", onAbort);
+        window.clearTimeout(timeout);
+        signal?.removeEventListener("abort", onAbort);
       });
   });
+}
+
+async function readErrorText(response: Response): Promise<string> {
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytesRead = 0;
+  let completed = false;
+
+  try {
+    while (bytesRead < MAX_ERROR_RESPONSE_BYTES) {
+      const { done, value } = await readWithTimeout(
+        reader,
+        undefined,
+        ERROR_RESPONSE_TIMEOUT_MS,
+        "Timed out while reading the API error response.",
+      );
+      if (done) {
+        completed = true;
+        break;
+      }
+
+      const remaining = MAX_ERROR_RESPONSE_BYTES - bytesRead;
+      const chunk = value.byteLength > remaining ? value.slice(0, remaining) : value;
+      bytesRead += chunk.byteLength;
+      text += decoder.decode(chunk, { stream: bytesRead < MAX_ERROR_RESPONSE_BYTES });
+      if (chunk.byteLength < value.byteLength) break;
+    }
+    if (completed) text += decoder.decode();
+    return text;
+  } finally {
+    if (!completed) await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
 }
 
 const API_KEY_HEADER_HOSTS = new Set(["api.xiaomimimo.com"]);
@@ -184,7 +224,7 @@ async function responseError(response: Response): Promise<ApiError> {
   let detail = "";
 
   try {
-    const responseText = await response.text();
+    const responseText = await readErrorText(response);
     try {
       const payload: unknown = JSON.parse(responseText);
       if (payload && typeof payload === "object") {
@@ -470,7 +510,8 @@ async function streamAttempt({ config, messages, signal, onDelta }: StreamOption
     if (buffer.trim()) processEvent(buffer);
     if (!completed) throw new ApiError("The streaming response ended unexpectedly.");
   } finally {
-    if (!completed) await reader.cancel().catch(() => undefined);
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
     linked.dispose();
   }
 }

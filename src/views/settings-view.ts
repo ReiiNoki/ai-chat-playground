@@ -103,14 +103,14 @@ export class SettingsView {
       const defaultModel = providerPreset.selectedOptions[0]?.dataset.defaultModel;
       if (defaultModel) modelInput.value = defaultModel;
       this.updateModelSuggestions();
-      endpointStatus.textContent = "";
+      this.setEndpointStatus("");
       this.protectKeyFromOriginChange();
       removeEndpointButton.hidden = !providerPreset.selectedOptions[0]?.dataset.customEndpointId;
       this.handlers?.onConnectionChange(true);
     });
 
     baseUrlInput.addEventListener("input", () => {
-      endpointStatus.textContent = "";
+      this.setEndpointStatus("");
       this.protectKeyFromOriginChange();
       this.syncProviderPreset();
       this.handlers?.onConnectionChange(true);
@@ -163,7 +163,7 @@ export class SettingsView {
     this.renderCustomEndpoints(customEndpoints);
     baseUrlInput.value = session.config.baseUrl;
     this.syncProviderPreset();
-    endpointStatus.textContent = "";
+    this.setEndpointStatus("");
     apiKeyInput.value = session.config.apiKey;
     this.keyOrigin = endpointOrigin(session.config.baseUrl);
     apiKeyInput.type = "password";
@@ -175,7 +175,7 @@ export class SettingsView {
     maxTokensInput.value = session.config.maxTokens?.toString() ?? "";
     topPInput.value = session.config.topP?.toString() ?? "";
     seedInput.value = session.config.seed?.toString() ?? "";
-    connectionStatus.textContent = t(session.connectionStatus);
+    this.setConnectionStatus(session.connectionStatus);
     this.setTesting(session.testingConnection);
     this.renderSendShortcut(sendShortcut);
     this.renderModelOptions(session);
@@ -256,7 +256,10 @@ export class SettingsView {
       modelInput.hidden = false;
     }
 
-    modelStatus.textContent = session.loadingModels ? t("Loading models…") : t(session.modelStatus);
+    this.setLocalizedText(
+      modelStatus,
+      session.loadingModels ? "Loading models…" : session.modelStatus,
+    );
     loadModelsButton.disabled = session.loadingModels;
     loadModelsButton.textContent = session.loadingModels ? t("Loading") : t("Load models");
     loadModelsButton.classList.toggle("is-loading", session.loadingModels);
@@ -265,15 +268,32 @@ export class SettingsView {
   }
 
   setConnectionStatus(status: string): void {
-    connectionStatus.textContent = t(status);
+    this.setLocalizedText(connectionStatus, status);
   }
 
   setEndpointStatus(status: string): void {
-    endpointStatus.textContent = t(status);
+    this.setLocalizedText(endpointStatus, status);
   }
 
   setStorageStatus(status: string): void {
-    storageStatus.textContent = t(status);
+    this.setLocalizedText(storageStatus, status);
+  }
+
+  refreshLanguage(session: ChatSession): void {
+    languageSelect.value = document.documentElement.lang === "zh-CN" ? "zh-CN" : "en";
+    keyVisibilityButton.textContent = apiKeyInput.type === "password" ? t("Show") : t("Hide");
+    keyVisibilityButton.setAttribute(
+      "aria-label",
+      apiKeyInput.type === "password" ? t("Show API key") : t("Hide API key"),
+    );
+    loadModelsButton.textContent = session.loadingModels ? t("Loading") : t("Load models");
+    testConnectionButton.textContent = session.testingConnection ? t("Testing") : t("Test connection");
+
+    for (const element of [endpointStatus, modelStatus, connectionStatus, storageStatus]) {
+      const source = element.dataset.i18nSource;
+      if (source !== undefined) element.textContent = t(source);
+    }
+    this.updateDirtyState();
   }
 
   renderSendShortcut(shortcut: SendShortcut): void {
@@ -335,7 +355,7 @@ export class SettingsView {
   private updateDirtyState(): void {
     const dirty = this.isDirty();
     settingsSaveButton.disabled = !dirty;
-    settingsChangeStatus.textContent = dirty ? "Unsaved changes" : "";
+    settingsChangeStatus.textContent = dirty ? t("Unsaved changes") : "";
   }
 
   private configsMatch(left: ApiConfig, right: ApiConfig): boolean {
@@ -356,8 +376,13 @@ export class SettingsView {
     if (apiKeyInput.value && nextOrigin && this.keyOrigin && nextOrigin !== this.keyOrigin) {
       apiKeyInput.value = "";
       this.keyOrigin = nextOrigin;
-      endpointStatus.textContent = "API key cleared because the API host changed.";
+      this.setEndpointStatus("API key cleared because the API host changed.");
     }
+  }
+
+  private setLocalizedText(element: HTMLElement, source: string): void {
+    element.dataset.i18nSource = source;
+    element.textContent = t(source);
   }
 
   private toggleKeyVisibility(): void {

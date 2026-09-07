@@ -155,33 +155,48 @@ function translatePattern(source: string): string {
   return source;
 }
 
+function elementsIn(root: ParentNode): Element[] {
+  return root instanceof Element
+    ? [root, ...root.querySelectorAll("*")]
+    : [...root.querySelectorAll("*")];
+}
+
+export function initializeDocumentTranslations(root: ParentNode = document): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    const textNode = node as Text;
+    const source = textNode.data.trim();
+    if (source) textSources.set(textNode, source);
+    node = walker.nextNode();
+  }
+
+  for (const element of elementsIn(root)) {
+    const sources = new Map<string, string>();
+    for (const attribute of TRANSLATED_ATTRIBUTES) {
+      const source = element.getAttribute(attribute);
+      if (source !== null) sources.set(attribute, source);
+    }
+    if (sources.size > 0) attributeSources.set(element, sources);
+  }
+}
+
 export function applyDocumentTranslations(root: ParentNode = document): void {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
   while (node) {
     const textNode = node as Text;
-    const trimmed = textNode.data.trim();
-    if (trimmed) {
-      const source = textSources.get(textNode) ?? trimmed;
-      textSources.set(textNode, source);
-      const translated = t(source);
-      textNode.data = textNode.data.replace(trimmed, translated);
+    const source = textSources.get(textNode);
+    if (source !== undefined) {
+      const current = textNode.data.trim();
+      textNode.data = textNode.data.replace(current, t(source));
     }
     node = walker.nextNode();
   }
 
-  const elements = root instanceof Element ? [root, ...root.querySelectorAll("*")] : root.querySelectorAll("*");
-  for (const element of elements) {
-    let sources = attributeSources.get(element);
-    if (!sources) {
-      sources = new Map();
-      attributeSources.set(element, sources);
-    }
-    for (const attribute of TRANSLATED_ATTRIBUTES) {
-      if (!element.hasAttribute(attribute)) continue;
-      const source = sources.get(attribute) ?? element.getAttribute(attribute) ?? "";
-      sources.set(attribute, source);
-      element.setAttribute(attribute, t(source));
-    }
+  for (const element of elementsIn(root)) {
+    const sources = attributeSources.get(element);
+    if (!sources) continue;
+    for (const [attribute, source] of sources) element.setAttribute(attribute, t(source));
   }
 }
