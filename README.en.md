@@ -1,5 +1,7 @@
 # AI Chat Playground
 
+[![Available in the Chrome Web Store](https://img.shields.io/badge/Available%20in-Chrome%20Web%20Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/ai-chat-playground/caicodmkoecekhdmoehoikilbkodbcel)
+
 [中文版](README.md)
 
 A lightweight Chrome and Edge side-panel extension for testing OpenAI-compatible chat APIs.
