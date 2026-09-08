@@ -9,6 +9,9 @@ coverage/
 .env.*
 !.env.example
 
+# Store source screenshots
+store-assets/test.png
+
 # Logs and temporary files
 *.log
 .tmp-*/
